@@ -1,0 +1,35 @@
+language: cpp
+compiler:
+- gcc
+- clang
+env:
+  global:
+  - APT_DEPENDENCIES="doxygen doxygen-latex libltdl-dev libboost-all-dev liblog4cxx10-dev libnlopt-dev"
+  - GIT_DEPENDENCIES="roboptim/roboptim-core"
+  - DEBSIGN_KEYID=5AE5CD75
+  - PPA_URI="roboptim/ppa"
+  - NSIQCPPSTYLE_FILEFILTERPATH=cmake/filefilter.txt
+  - GH_USERNAME=thomas-moulard
+  - GH_REPO=roboptim/roboptim-core-plugin-nlopt
+  - secure: YurfcUtraOayjgYuay0IDyY2FssU53q91VzeYXzAd1VdxH9IAatXXwQpBj8i/dSPM/1NtpB3gISpBktOy+KN7to7gKWeOQHWQOPae0SbuTPfOE5uyl1zWTtOypA3CI51el1+kmYN39Qi4ASt9LN5CD1ZZrsso7aH2bS/6YLWchA=
+  - secure: LRvqill/xVFcjMoco3qp0XrfGOi6U+syq1XbT7OTwZfHtIJii63McrmlqWP9d7vrxzwsi+F5i5fvpjLy6Idp7aX4myGiRXp7yZJC/rNVDVNbgosv4NNXE511S1C9ObGSksuTbF8oYa4qA8sMB1ZJW1A2cqeODBHYBr7rrEIIZ+U=
+  - secure: XFVC3kdigudQBqS56o8aUGRimJZe4fYz8pNzwBjkqyLp7GFshzcWJqitR8lS+/pbg7PmrVsyEivFvSY9j0bd4XEvZQY+WOfJHfS6X9G0IEoXmKw52muNIt/AwRXeeD8dX5FqPbtO65vKP+zgItSrlCiWpTpTF0uDjRGW3SYyaZA=
+notifications:
+  hipchat:
+    rooms:
+      secure: LJbgx2sjAmTUu+AV8N/PSQHFQ8E1OnHAB2oYFv1XwN2hujtswNwE9k16etaEBRZ0IP1z7mTWrabaztDPC5efEaGpi4TZLMr5P9n/ABWRvJi+tVMXG7fusxTNzOaqcr31g2VQBXJ2nMZWxawP4xzTp+sSVcVsHm5xt4UjLyVQ6+A=
+  email: roboptim@googlegroups.com
+before_install:
+- ./.travis/dependencies/eigen-3.2.0
+- ./.travis/run  before_install
+script:
+- export LD_LIBRARY_PATH=`pkg-config --variable=plugindir roboptim-core`:$LD_LIBRARY_PATH; ./.travis/run build
+after_success: ./.travis/run after_success
+after_failure: ./.travis/run after_failure
+branches:
+  only:
+  - master
+  - debian
+matrix:
+  allow_failures:
+  - compiler: clang
