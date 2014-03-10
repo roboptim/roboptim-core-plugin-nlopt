@@ -28,7 +28,8 @@ SET(PROGRAM_SUFFIX "")
 SET(COST_FUNCTION_TYPE ::roboptim::GenericDifferentiableFunction)
 SET(CONSTRAINT_TYPE_1 ::roboptim::GenericLinearFunction)
 SET(CONSTRAINT_TYPE_2 ::roboptim::GenericDifferentiableFunction)
-BUILD_SCHITTKOWSKI_PROBLEMS()
+# TODO: build Schittkowski problems as soon as the plugin is ready
+#BUILD_SCHITTKOWSKI_PROBLEMS()
 
 # RobOptim test problems
 SET(SOLVER_NAME "nlopt")
