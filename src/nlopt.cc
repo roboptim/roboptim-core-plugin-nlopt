@@ -213,16 +213,30 @@ namespace roboptim
 			  (parameters ()["nlopt.xtol_abs"].value));
 
       // Set objective function
-      detail::Wrapper<function_t> obj (problem ().function ());
-      opt.set_min_objective (detail::Wrapper<function_t>::wrap,
-                             &obj);
+      typedef detail::Wrapper<function_t> obj_wrapper_t;
+      obj_wrapper_t obj (problem ().function ());
+      opt.set_min_objective (obj_wrapper_t::wrap, &obj);
+
+      // Add bound constraints
+      std::vector<double> lb, ub;
+      const intervals_t& bounds = problem ().argumentBounds ();
+      for (intervals_t::const_iterator
+	     interval = bounds.begin ();
+           interval != bounds.end ();
+           ++interval)
+	{
+          lb.push_back (interval->first);
+          ub.push_back (interval->second);
+	}
+      opt.set_lower_bounds (lb);
+      opt.set_upper_bounds (ub);
 
       double res_min;
       std::vector<double> stl_x (n_);
       Map<argument_t> map_x (stl_x.data (), n_);
       map_x = x_;
 
-      // Solve problem
+      // Solve problem with initial x
       ::nlopt::result result = opt.optimize (stl_x, res_min);
 
       switch (result)

@@ -53,6 +53,14 @@ namespace roboptim {
       typedef DifferentiableFunction::gradient_t gradient_t;
       /// \brief Size type
       typedef Function::size_type size_type;
+      /// \brief Constraints type
+      typedef problem_t::constraints_t constraints_t;
+      /// \brief Constraint type
+      typedef problem_t::constraint_t constraint_t;
+      /// \brief Intervals type
+      typedef problem_t::intervals_t intervals_t;
+      /// \brief Interval type
+      typedef problem_t::interval_t interval_t;
 
       /// \brief Solver state
       typedef SolverState<parent_t::problem_t> solverState_t;
@@ -102,6 +110,10 @@ namespace roboptim {
       {
         return callback_;
       }
+
+    public:
+      static const int linearFunctionId = 0;
+      static const int nonlinearFunctionId = 1;
 
     private:
       /// \brief Initialize solver parameters.
