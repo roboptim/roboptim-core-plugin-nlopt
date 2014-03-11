@@ -115,8 +115,10 @@ namespace roboptim
 
       // Load <algo string, algo> map
       algo_map_ = boost::assign::map_list_of
-#define N_ALGO 2
-#define ALGO_LIST (N_ALGO, (LD_MMA,LD_SLSQP))
+#define N_ALGO 9
+#define ALGO_LIST (N_ALGO, (LD_MMA, LD_SLSQP, LD_LBFGS, LD_VAR1, LD_VAR2, \
+                            LD_TNEWTON_PRECOND_RESTART, LD_TNEWTON_PRECOND, \
+                            LD_TNEWTON_RESTART, LD_TNEWTON))
 #define GET_ALGO(n) BOOST_PP_ARRAY_ELEM(n,ALGO_LIST)
 #define BOOST_PP_LOCAL_MACRO(n)				\
 	(std::string (BOOST_PP_STRINGIZE(GET_ALGO(n))), \
