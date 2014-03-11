@@ -104,6 +104,10 @@ namespace roboptim {
       }
 
     private:
+      /// \brief Initialize solver parameters.
+      void initializeParameters () throw ();
+
+    private:
       /// \brief Number of variables
       size_type n_;
       /// \brief Dimension of the cost function
@@ -118,8 +122,11 @@ namespace roboptim {
       /// \brief Intermediate callback (called at each end of iteration).
       callback_t callback_;
 
-      /// \brief Map of <optimization status, result message>
+      /// \brief Map optimization result to result message
       std::map< ::nlopt::result, std::string> result_map_;
+
+      /// \brief Map string to NLopt algorithm
+      std::map<std::string, ::nlopt::algorithm> algo_map_;
     }; // class SolverNlp
   } // namespace nlopt
 } // namespace roboptim

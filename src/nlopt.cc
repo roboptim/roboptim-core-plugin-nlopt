@@ -18,8 +18,12 @@
 
 #include <cstring>
 #include <map>
+#include <limits> // epsilon
 
 #include <boost/assign/list_of.hpp>
+#include <boost/preprocessor/array/elem.hpp>
+#include <boost/preprocessor/iteration/local.hpp>
+#include <boost/preprocessor/stringize.hpp>
 
 #include <roboptim/core/function.hh>
 #include <roboptim/core/linear-function.hh>
@@ -78,8 +82,11 @@ namespace roboptim
       x_ (n_),
       solverState_ (problem)
     {
-      // Initialize this class parameters
+      // Initialize x
       x_.setZero ();
+
+      // Initialize solver parameters
+      initializeParameters ();
 
       // Load <Status, warning message> map
       result_map_ = boost::assign::map_list_of
@@ -105,10 +112,52 @@ namespace roboptim
          "Maximum number of evaluations reached")
         (::nlopt::MAXTIME_REACHED,
          "Maximum time reached");
+
+      // Load <algo string, algo> map
+      algo_map_ = boost::assign::map_list_of
+#define N_ALGO 2
+#define ALGO_LIST (N_ALGO, (LD_MMA,LD_SLSQP))
+#define GET_ALGO(n) BOOST_PP_ARRAY_ELEM(n,ALGO_LIST)
+#define BOOST_PP_LOCAL_MACRO(n)				\
+	(std::string (BOOST_PP_STRINGIZE(GET_ALGO(n))), \
+	 ::nlopt::GET_ALGO(n))
+#define BOOST_PP_LOCAL_LIMITS (0,N_ALGO-1)
+#include BOOST_PP_LOCAL_ITERATE()
+	;
+#undef ALGO_LIST
+#undef N_ALGO
     }
 
     SolverNlp::~SolverNlp () throw ()
     {
+    }
+
+#define DEFINE_PARAMETER(KEY, DESCRIPTION, VALUE)	\
+    do {						\
+      parameters ()[KEY].description = DESCRIPTION;	\
+      parameters ()[KEY].value = VALUE;			\
+    } while (0)
+
+    void SolverNlp::initializeParameters () throw ()
+    {
+      // Clear parameters
+      parameters ().clear ();
+
+      double epsilon = std::numeric_limits<double>::epsilon ();
+
+      // Shared parameters
+      DEFINE_PARAMETER ("max-iterations", "number of iterations", 3000);
+
+      // NLopt-specific parameters
+      DEFINE_PARAMETER ("nlopt.algorithm",
+			"optimization algorithm",
+			std::string ("LD_MMA"));
+      DEFINE_PARAMETER ("nlopt.xtol_rel",
+			"relative tolerance on optimization parameters",
+			epsilon);
+      DEFINE_PARAMETER ("nlopt.xtol_abs",
+			"absolute tolerance on optimization parameters",
+			epsilon);
     }
 
     // Utility macro to print result with warning message
@@ -142,11 +191,24 @@ namespace roboptim
 	}
 
       // Create NLopt solver
-      // TODO: choose appropriate solver
-      ::nlopt::opt opt(::nlopt::LD_MMA, static_cast<unsigned int> (n_));
+      // Check mandatory NLopt optimization algorithm
+      if (parameters ().find ("nlopt.algorithm") == parameters ().end ())
+	{
+          result_ = SolverError ("Undefined NLopt algorithm.");
+          return;
+	}
 
-      // TODO: set appropriate tolerances
-      opt.set_xtol_rel (1e-4);
+      ::nlopt::opt opt (algo_map_[boost::get<std::string>
+                                  (parameters ()["nlopt.algorithm"].value)],
+                        static_cast<unsigned int> (n_));
+
+      // Set appropriate tolerances
+      if (parameters ().find ("nlopt.xtol_rel") != parameters ().end ())
+	opt.set_xtol_rel (boost::get<double>
+			  (parameters ()["nlopt.xtol_rel"].value));
+      if (parameters ().find ("nlopt.xtol_abs") != parameters ().end ())
+	opt.set_xtol_abs (boost::get<double>
+			  (parameters ()["nlopt.xtol_abs"].value));
 
       // Set objective function
       detail::Wrapper<function_t> obj (problem ().function ());
