@@ -25,10 +25,16 @@
 #include <boost/preprocessor/iteration/local.hpp>
 #include <boost/preprocessor/stringize.hpp>
 
+#include <boost/optional.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/make_shared.hpp>
+
 #include <roboptim/core/function.hh>
 #include <roboptim/core/linear-function.hh>
 #include <roboptim/core/problem.hh>
 #include <roboptim/core/solver-error.hh>
+#include <roboptim/core/filter/minus.hh>
+#include <roboptim/core/function/constant.hh>
 
 #include "roboptim/core/plugin/nlopt/nlopt.hh"
 
@@ -38,19 +44,26 @@ namespace roboptim
   {
     namespace detail
     {
+      using namespace Eigen;
+
       /// \brief Wrapper for NLopt functions.
       template <typename F>
       class Wrapper
       {
       public:
+        typedef Matrix<double,Dynamic,Dynamic,RowMajor> jacobian_t;
+        typedef Map<jacobian_t> map_jacobian_t;
+        typedef DifferentiableFunction::result_t result_t;
+        typedef Map<result_t> map_result_t;
+        typedef DifferentiableFunction::argument_t argument_t;
+        typedef Map<const argument_t> map_argument_t;
+
 	Wrapper (const F& f) : f_ (f) {}
 	~Wrapper () {}
 
 	double compute(const std::vector<double>& x,
 		       std::vector<double>& grad)
 	{
-	  using namespace Eigen;
-
 	  Map<const VectorXd> eigen_x (x.data (), x.size ());
 	  Map<VectorXd> eigen_grad (grad.data (), grad.size ());
 	  // Compute grad_f(x)
@@ -63,11 +76,40 @@ namespace roboptim
 	  return f_ (eigen_x)[0];
 	}
 
+	void compute(const map_argument_t& x,
+		     map_result_t& res,
+		     boost::optional<map_jacobian_t>& jac)
+	{
+	  // Compute the Jacobian of f
+	  if (jac) *jac = f_.jacobian (x);
+
+	  // Compute f(x)
+	  res = f_ (x);
+	}
+
+	// TODO: use C-style NLopt function to prevent copy to STL vector
+	/// \brief Wrap function
 	static double wrap(const std::vector<double>& x,
 			   std::vector<double>& grad,
 			   void *data)
 	{
 	  return (*reinterpret_cast<Wrapper<F>*> (data)).compute (x, grad);
+	}
+
+	/// \brief Wrap vector-valued function
+	static void vwrap(unsigned m, double* res,
+			  unsigned n, const double* x,
+			  double* grad, void *data)
+	{
+	  map_argument_t map_x (x, n);
+	  map_result_t map_res (res, m);
+	  // Note: gradients are stored contiguously, i.e. dci/dxj is
+	  // stored in grad[i*n+j] where c: R^n -> R^m
+	  boost::optional<map_jacobian_t> map_jac;
+	  if (grad != NULL) map_jac = map_jacobian_t (grad, n, m);
+	  (*reinterpret_cast<Wrapper<F>*> (data)).compute (map_x,
+							   map_res,
+							   map_jac);
 	}
 
       protected:
@@ -230,6 +272,65 @@ namespace roboptim
 	}
       opt.set_lower_bounds (lb);
       opt.set_upper_bounds (ub);
+
+      typedef detail::Wrapper<DifferentiableFunction> constraint_wrapper_t;
+      typedef boost::shared_ptr<constraint_wrapper_t> constraint_wrapper_ptr;
+      size_t iter = 0;
+      std::vector<boost::shared_ptr<DifferentiableFunction> > constraints;
+      std::vector<constraint_wrapper_ptr> constraint_wrappers;
+      constraints.reserve (problem ().constraints ().size ());
+      constraint_wrappers.reserve (problem ().constraints ().size ());
+
+      // Iterate over constraints
+      for (constraints_t::const_iterator
+	     cstr = problem ().constraints ().begin ();
+           cstr != problem ().constraints ().end ();
+           ++cstr)
+	{
+          // Set constraints
+          boost::shared_ptr<DifferentiableFunction> g;
+          if (cstr->which () == linearFunctionId)
+	    g = boost::get<boost::shared_ptr<LinearFunction> > (*cstr);
+          else
+	    g = boost::get<boost::shared_ptr<DifferentiableFunction> > (*cstr);
+          assert (!!g);
+
+          constraints.push_back (g);
+
+          result_t offset (g->outputSize ());
+          offset.setZero ();
+          boost::shared_ptr<ConstantFunction> null_f =
+	    boost::make_shared<ConstantFunction> (offset);
+          boost::shared_ptr<DifferentiableFunction> minus_g = null_f-g;
+
+
+          // For each dimension
+	  constraint_wrapper_ptr wrapper (new constraint_wrapper_t (*g));
+	  constraint_wrappers.push_back (wrapper);
+
+	  // c <= tol
+	  const intervals_t& tol = problem ().boundsVector ()[iter];
+	  lb.clear ();
+	  ub.clear ();
+	  for (intervals_t::const_iterator
+		 interval = tol.begin ();
+	       interval != tol.end ();
+	       ++interval)
+	    {
+	      lb.push_back (-interval->first);
+	      ub.push_back (interval->second);
+	    }
+	  // Process: c <= ub
+	  opt.add_inequality_mconstraint (constraint_wrapper_t::vwrap,
+					  wrapper.get (), ub);
+
+	  // Process: lb <= c, i.e. -c <= -lb
+	  opt.add_inequality_mconstraint (constraint_wrapper_t::vwrap,
+					  wrapper.get (), lb);
+          ++iter;
+
+          // TODO: handle equality constraints
+	}
 
       double res_min;
       std::vector<double> stl_x (n_);

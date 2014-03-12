@@ -48,7 +48,7 @@ namespace roboptim {
       /// \brief Argument type
       typedef function_t::argument_t argument_t;
       /// \brief type of result
-      typedef parent_t::result_t result_t;
+      typedef function_t::result_t result_t;
       /// \brief type of gradient
       typedef DifferentiableFunction::gradient_t gradient_t;
       /// \brief Size type
