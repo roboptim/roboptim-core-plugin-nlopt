@@ -33,8 +33,9 @@
 #include <roboptim/core/linear-function.hh>
 #include <roboptim/core/problem.hh>
 #include <roboptim/core/solver-error.hh>
-#include <roboptim/core/filter/minus.hh>
 #include <roboptim/core/function/constant.hh>
+#include <roboptim/core/filter/plus.hh>
+#include <roboptim/core/filter/minus.hh>
 
 #include "roboptim/core/plugin/nlopt/nlopt.hh"
 
@@ -51,12 +52,12 @@ namespace roboptim
       class Wrapper
       {
       public:
-        typedef Matrix<double,Dynamic,Dynamic,RowMajor> jacobian_t;
-        typedef Map<jacobian_t> map_jacobian_t;
-        typedef DifferentiableFunction::result_t result_t;
-        typedef Map<result_t> map_result_t;
-        typedef DifferentiableFunction::argument_t argument_t;
-        typedef Map<const argument_t> map_argument_t;
+	typedef Matrix<double,Dynamic,Dynamic,RowMajor> jacobian_t;
+	typedef Map<jacobian_t> map_jacobian_t;
+	typedef DifferentiableFunction::result_t result_t;
+	typedef Map<result_t> map_result_t;
+	typedef DifferentiableFunction::argument_t argument_t;
+	typedef Map<const argument_t> map_argument_t;
 
 	Wrapper (const F& f) : f_ (f) {}
 	~Wrapper () {}
@@ -106,7 +107,7 @@ namespace roboptim
 	  // Note: gradients are stored contiguously, i.e. dci/dxj is
 	  // stored in grad[i*n+j] where c: R^n -> R^m
 	  boost::optional<map_jacobian_t> map_jac;
-	  if (grad != NULL) map_jac = map_jacobian_t (grad, n, m);
+	  if (grad != NULL) map_jac = map_jacobian_t (grad, m, n);
 	  (*reinterpret_cast<Wrapper<F>*> (data)).compute (map_x,
 							   map_res,
 							   map_jac);
@@ -127,40 +128,44 @@ namespace roboptim
       // Initialize x
       x_.setZero ();
 
+      epsilon_ = std::numeric_limits<double>::epsilon ();
+
       // Initialize solver parameters
       initializeParameters ();
 
       // Load <Status, warning message> map
       result_map_ = boost::assign::map_list_of
-        (::nlopt::FAILURE,
-         "Failure")
-        (::nlopt::INVALID_ARGS,
-         "Invalid arguments")
-        (::nlopt::OUT_OF_MEMORY,
-         "Out of memory")
-        (::nlopt::ROUNDOFF_LIMITED,
-         "Roundoff limited")
-        (::nlopt::FORCED_STOP,
-         "Forced stop")
-        (::nlopt::SUCCESS,
-         "Optimization success")
-        (::nlopt::STOPVAL_REACHED,
-         "Stop value reached")
-        (::nlopt::FTOL_REACHED,
-         "f tolerance reached")
-        (::nlopt::XTOL_REACHED,
-         "x tolerance reached")
-        (::nlopt::MAXEVAL_REACHED,
-         "Maximum number of evaluations reached")
-        (::nlopt::MAXTIME_REACHED,
-         "Maximum time reached");
+	(::nlopt::FAILURE,
+	 "Failure")
+	(::nlopt::INVALID_ARGS,
+	 "Invalid arguments")
+	(::nlopt::OUT_OF_MEMORY,
+	 "Out of memory")
+	(::nlopt::ROUNDOFF_LIMITED,
+	 "Roundoff limited")
+	(::nlopt::FORCED_STOP,
+	 "Forced stop")
+	(::nlopt::SUCCESS,
+	 "Optimization success")
+	(::nlopt::STOPVAL_REACHED,
+	 "Stop value reached")
+	(::nlopt::FTOL_REACHED,
+	 "f tolerance reached")
+	(::nlopt::XTOL_REACHED,
+	 "x tolerance reached")
+	(::nlopt::MAXEVAL_REACHED,
+	 "Maximum number of evaluations reached")
+	(::nlopt::MAXTIME_REACHED,
+	 "Maximum time reached");
 
       // Load <algo string, algo> map
       algo_map_ = boost::assign::map_list_of
-#define N_ALGO 9
+#define N_ALGO 15
 #define ALGO_LIST (N_ALGO, (LD_MMA, LD_SLSQP, LD_LBFGS, LD_VAR1, LD_VAR2, \
                             LD_TNEWTON_PRECOND_RESTART, LD_TNEWTON_PRECOND, \
-                            LD_TNEWTON_RESTART, LD_TNEWTON))
+                            LD_TNEWTON_RESTART, LD_TNEWTON,		\
+                            GD_MLSL, GD_MLSL_LDS, GD_STOGO,		\
+                            GN_ISRES, GN_ORIG_DIRECT, GN_ORIG_DIRECT_L))
 #define GET_ALGO(n) BOOST_PP_ARRAY_ELEM(n,ALGO_LIST)
 #define BOOST_PP_LOCAL_MACRO(n)				\
 	(std::string (BOOST_PP_STRINGIZE(GET_ALGO(n))), \
@@ -187,21 +192,19 @@ namespace roboptim
       // Clear parameters
       parameters ().clear ();
 
-      double epsilon = std::numeric_limits<double>::epsilon ();
-
       // Shared parameters
-      DEFINE_PARAMETER ("max-iterations", "number of iterations", 3000);
+      DEFINE_PARAMETER ("max-iterations", "number of iterations", 10000);
 
       // NLopt-specific parameters
       DEFINE_PARAMETER ("nlopt.algorithm",
 			"optimization algorithm",
-			std::string ("LD_MMA"));
+			std::string ("LD_SLSQP"));
       DEFINE_PARAMETER ("nlopt.xtol_rel",
 			"relative tolerance on optimization parameters",
-			epsilon);
+			epsilon_);
       DEFINE_PARAMETER ("nlopt.xtol_abs",
 			"absolute tolerance on optimization parameters",
-			epsilon);
+			epsilon_);
     }
 
     // Utility macro to print result with warning message
@@ -211,6 +214,7 @@ namespace roboptim
       ResultWithWarnings result (n_, 1);				\
       result.x = map_x;							\
       result.value = problem ().function () (result.x);			\
+      result.constraints.resize (problem ().constraints ().size ());	\
       result.warnings.push_back (SolverWarning (result_map_[STATUS]));	\
       result_ = result;							\
     }									\
@@ -238,13 +242,13 @@ namespace roboptim
       // Check mandatory NLopt optimization algorithm
       if (parameters ().find ("nlopt.algorithm") == parameters ().end ())
 	{
-          result_ = SolverError ("Undefined NLopt algorithm.");
-          return;
+	  result_ = SolverError ("Undefined NLopt algorithm.");
+	  return;
 	}
 
       ::nlopt::opt opt (algo_map_[boost::get<std::string>
-                                  (parameters ()["nlopt.algorithm"].value)],
-                        static_cast<unsigned int> (n_));
+				  (parameters ()["nlopt.algorithm"].value)],
+			static_cast<unsigned int> (n_));
 
       // Set appropriate tolerances
       if (parameters ().find ("nlopt.xtol_rel") != parameters ().end ())
@@ -253,6 +257,9 @@ namespace roboptim
       if (parameters ().find ("nlopt.xtol_abs") != parameters ().end ())
 	opt.set_xtol_abs (boost::get<double>
 			  (parameters ()["nlopt.xtol_abs"].value));
+      if (parameters ().find ("max-iterations") != parameters ().end ())
+	opt.set_maxeval (boost::get<int>
+			 (parameters ()["max-iterations"].value));
 
       // Set objective function
       typedef detail::Wrapper<function_t> obj_wrapper_t;
@@ -262,13 +269,18 @@ namespace roboptim
       // Add bound constraints
       std::vector<double> lb, ub;
       const intervals_t& bounds = problem ().argumentBounds ();
-      for (intervals_t::const_iterator
-	     interval = bounds.begin ();
-           interval != bounds.end ();
-           ++interval)
+      for (size_t i = 0; i < bounds.size (); ++i)
 	{
-          lb.push_back (interval->first);
-          ub.push_back (interval->second);
+	  double lower = bounds[i].first;
+	  double upper = bounds[i].second;
+
+	  // If starting point outside of bounds: move x to bounds
+	  // (else the solver may fail at start)
+	  if (x_[i] < lower) x_[i] = lower;
+	  if (x_[i] > upper) x_[i] = upper;
+
+	  lb.push_back (lower);
+	  ub.push_back (upper);
 	}
       opt.set_lower_bounds (lb);
       opt.set_upper_bounds (ub);
@@ -284,52 +296,61 @@ namespace roboptim
       // Iterate over constraints
       for (constraints_t::const_iterator
 	     cstr = problem ().constraints ().begin ();
-           cstr != problem ().constraints ().end ();
-           ++cstr)
+	   cstr != problem ().constraints ().end ();
+	   ++cstr)
 	{
-          // Set constraints
-          boost::shared_ptr<DifferentiableFunction> g;
-          if (cstr->which () == linearFunctionId)
+	  // Set constraints
+	  boost::shared_ptr<DifferentiableFunction> g;
+	  if (cstr->which () == linearFunctionId)
 	    g = boost::get<boost::shared_ptr<LinearFunction> > (*cstr);
-          else
+	  else
 	    g = boost::get<boost::shared_ptr<DifferentiableFunction> > (*cstr);
-          assert (!!g);
+	  assert (!!g);
 
-          constraints.push_back (g);
+	  constraints.push_back (g);
 
-          result_t offset (g->outputSize ());
-          offset.setZero ();
-          boost::shared_ptr<ConstantFunction> null_f =
-	    boost::make_shared<ConstantFunction> (offset);
-          boost::shared_ptr<DifferentiableFunction> minus_g = null_f-g;
+	  const intervals_t& bounds = problem ().boundsVector ()[iter];
 
+	  // Vector of tolerances
+	  std::vector<double> vec_tol (g->outputSize (), epsilon_);
 
-          // For each dimension
-	  constraint_wrapper_ptr wrapper (new constraint_wrapper_t (*g));
-	  constraint_wrappers.push_back (wrapper);
+	  ConstantFunction::result_t lowerBoundValues (g->outputSize ());
+	  ConstantFunction::result_t upperBoundValues (g->outputSize ());
 
-	  // c <= tol
-	  const intervals_t& tol = problem ().boundsVector ()[iter];
-	  lb.clear ();
-	  ub.clear ();
-	  for (intervals_t::const_iterator
-		 interval = tol.begin ();
-	       interval != tol.end ();
-	       ++interval)
+	  for (unsigned i = 0; i < g->outputSize (); ++i)
 	    {
-	      lb.push_back (-interval->first);
-	      ub.push_back (interval->second);
+	      lowerBoundValues[i] = bounds[i].first;
+	      upperBoundValues[i] = bounds[i].second;
 	    }
+	  boost::shared_ptr<ConstantFunction> cst_lb =
+	    boost::make_shared<ConstantFunction> (g->inputSize (),
+                                              lowerBoundValues);
+	  boost::shared_ptr<ConstantFunction> cst_ub =
+	    boost::make_shared<ConstantFunction> (g->inputSize (),
+                                              upperBoundValues);
+
+	  boost::shared_ptr<DifferentiableFunction> g_lb = cst_lb - g;
+	  boost::shared_ptr<DifferentiableFunction> g_ub = g - cst_ub;
+
+	  constraint_wrapper_ptr wrapper_ub (new constraint_wrapper_t (*g_ub));
+	  constraint_wrappers.push_back (wrapper_ub);
+	  constraints.push_back (g_ub);
+
+	  constraint_wrapper_ptr wrapper_lb (new constraint_wrapper_t (*g_lb));
+	  constraint_wrappers.push_back (wrapper_lb);
+	  constraints.push_back (g_lb);
+
+	  // Inequality constraint
 	  // Process: c <= ub
 	  opt.add_inequality_mconstraint (constraint_wrapper_t::vwrap,
-					  wrapper.get (), ub);
+					  wrapper_ub.get (), vec_tol);
 
 	  // Process: lb <= c, i.e. -c <= -lb
 	  opt.add_inequality_mconstraint (constraint_wrapper_t::vwrap,
-					  wrapper.get (), lb);
-          ++iter;
+					  wrapper_lb.get (), vec_tol);
+	  ++iter;
 
-          // TODO: handle equality constraints
+	  // TODO: handle equality constraints
 	}
 
       double res_min;
@@ -338,35 +359,43 @@ namespace roboptim
       map_x = x_;
 
       // Solve problem with initial x
-      ::nlopt::result result = opt.optimize (stl_x, res_min);
+      ::nlopt::result opt_result;
+      try {
+          opt_result = opt.optimize (stl_x, res_min);
+      }
+      // Result may still be correct when a roundoff exception is thrown.
+      catch (::nlopt::roundoff_limited e)
+      {
+          opt_result = ::nlopt::ROUNDOFF_LIMITED;
+      }
 
-      switch (result)
+      switch (opt_result)
 	{
 	case ::nlopt::SUCCESS:
 	  {
 	    Result result (n_, 1);
 	    result.x = map_x;
 	    result.value = problem ().function () (result.x);
+	    result.constraints.resize (problem ().constraints ().size ());
 	    result_ = result;
 	  }
 	  break;
 
-	  LOAD_RESULT_WARNINGS (::nlopt::STOPVAL_REACHED)
-	    LOAD_RESULT_WARNINGS (::nlopt::FTOL_REACHED)
-	    LOAD_RESULT_WARNINGS (::nlopt::XTOL_REACHED)
-	    LOAD_RESULT_WARNINGS (::nlopt::MAXEVAL_REACHED)
-	    LOAD_RESULT_WARNINGS (::nlopt::MAXTIME_REACHED)
-
-	    LOAD_RESULT_ERROR (::nlopt::FAILURE)
-	    LOAD_RESULT_ERROR (::nlopt::INVALID_ARGS)
-	    LOAD_RESULT_ERROR (::nlopt::OUT_OF_MEMORY)
-	    LOAD_RESULT_ERROR (::nlopt::ROUNDOFF_LIMITED)
-	    LOAD_RESULT_ERROR (::nlopt::FORCED_STOP)
+	  LOAD_RESULT_WARNINGS (::nlopt::STOPVAL_REACHED);
+	  LOAD_RESULT_WARNINGS (::nlopt::FTOL_REACHED);
+	  LOAD_RESULT_WARNINGS (::nlopt::XTOL_REACHED);
+	  LOAD_RESULT_WARNINGS (::nlopt::MAXEVAL_REACHED);
+	  LOAD_RESULT_WARNINGS (::nlopt::MAXTIME_REACHED);
+	  LOAD_RESULT_WARNINGS (::nlopt::ROUNDOFF_LIMITED);
+	  LOAD_RESULT_ERROR (::nlopt::FAILURE);
+	  LOAD_RESULT_ERROR (::nlopt::INVALID_ARGS);
+	  LOAD_RESULT_ERROR (::nlopt::OUT_OF_MEMORY);
+	  LOAD_RESULT_ERROR (::nlopt::FORCED_STOP);
 
 	default:
-	    {
-	      result_ = SolverError ("Error");
-	    }
+	  {
+	    result_ = SolverError ("Error");
+	  }
 	}
     }
 

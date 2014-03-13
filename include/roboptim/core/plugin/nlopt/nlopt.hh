@@ -139,6 +139,9 @@ namespace roboptim {
 
       /// \brief Map string to NLopt algorithm
       std::map<std::string, ::nlopt::algorithm> algo_map_;
+
+      /// \brief Epsilon
+      double epsilon_;
     }; // class SolverNlp
   } // namespace nlopt
 } // namespace roboptim
