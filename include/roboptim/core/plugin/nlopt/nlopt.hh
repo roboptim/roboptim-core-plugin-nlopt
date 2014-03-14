@@ -19,6 +19,9 @@
 #ifndef ROBOPTIM_CORE_PLUGIN_NLOPT_NLOPT_HH
 # define ROBOPTIM_CORE_PLUGIN_NLOPT_NLOPT_HH
 
+# include <map>
+# include <set>
+
 # include <boost/mpl/vector.hpp>
 
 # include <roboptim/core/solver.hh>
@@ -139,6 +142,9 @@ namespace roboptim {
 
       /// \brief Map string to NLopt algorithm
       std::map<std::string, ::nlopt::algorithm> algo_map_;
+
+      /// \brief Set of global algorithms that expect a local algorithm.
+      std::set<std::string> global_algos_;
 
       /// \brief Epsilon
       double epsilon_;

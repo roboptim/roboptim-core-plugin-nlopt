@@ -123,7 +123,9 @@ namespace roboptim
       n_ (problem.function ().inputSize ()),
       m_ (problem.function ().outputSize ()),
       x_ (n_),
-      solverState_ (problem)
+      solverState_ (problem),
+      algo_map_ (),
+      global_algos_ ()
     {
       // Initialize x
       x_.setZero ();
@@ -160,12 +162,14 @@ namespace roboptim
 
       // Load <algo string, algo> map
       algo_map_ = boost::assign::map_list_of
-#define N_ALGO 15
+#define N_ALGO 21
 #define ALGO_LIST (N_ALGO, (LD_MMA, LD_SLSQP, LD_LBFGS, LD_VAR1, LD_VAR2, \
                             LD_TNEWTON_PRECOND_RESTART, LD_TNEWTON_PRECOND, \
                             LD_TNEWTON_RESTART, LD_TNEWTON,		\
                             GD_MLSL, GD_MLSL_LDS, GD_STOGO,		\
-                            GN_ISRES, GN_ORIG_DIRECT, GN_ORIG_DIRECT_L))
+                            GN_ISRES, GN_ORIG_DIRECT, GN_ORIG_DIRECT_L, \
+                            AUGLAG, AUGLAG_EQ, LD_AUGLAG, LD_AUGLAG_EQ, \
+                            GD_MLSL, GD_MLSL_LDS))
 #define GET_ALGO(n) BOOST_PP_ARRAY_ELEM(n,ALGO_LIST)
 #define BOOST_PP_LOCAL_MACRO(n)				\
 	(std::string (BOOST_PP_STRINGIZE(GET_ALGO(n))), \
@@ -175,6 +179,13 @@ namespace roboptim
 	;
 #undef ALGO_LIST
 #undef N_ALGO
+
+      global_algos_.insert ("AUGLAG");
+      global_algos_.insert ("AUGLAG_EQ");
+      global_algos_.insert ("LD_AUGLAG");
+      global_algos_.insert ("LD_AUGLAG_EQ");
+      global_algos_.insert ("GD_MLSL");
+      global_algos_.insert ("GD_MLSL_LDS");
     }
 
     SolverNlp::~SolverNlp () throw ()
@@ -198,7 +209,10 @@ namespace roboptim
       // NLopt-specific parameters
       DEFINE_PARAMETER ("nlopt.algorithm",
 			"optimization algorithm",
-			std::string ("LD_SLSQP"));
+			std::string ("LD_AUGLAG"));
+      DEFINE_PARAMETER ("nlopt.local_algorithm",
+			"local optimization algorithm",
+			std::string ("LD_MMA"));
       DEFINE_PARAMETER ("nlopt.xtol_rel",
 			"relative tolerance on optimization parameters",
 			epsilon_);
@@ -246,9 +260,9 @@ namespace roboptim
 	  return;
 	}
 
-      ::nlopt::opt opt (algo_map_[boost::get<std::string>
-				  (parameters ()["nlopt.algorithm"].value)],
-			static_cast<unsigned int> (n_));
+      std::string opt_algo
+	= boost::get<std::string> (parameters ()["nlopt.algorithm"].value);
+      ::nlopt::opt opt (algo_map_[opt_algo], static_cast<unsigned int> (n_));
 
       // Set appropriate tolerances
       if (parameters ().find ("nlopt.xtol_rel") != parameters ().end ())
@@ -260,6 +274,20 @@ namespace roboptim
       if (parameters ().find ("max-iterations") != parameters ().end ())
 	opt.set_maxeval (boost::get<int>
 			 (parameters ()["max-iterations"].value));
+
+      // If using a global algorithm that relies on a local algorithm
+      if (global_algos_.find (opt_algo) != global_algos_.end ())
+	{
+          // We need to set a local optimizer (a copy is made into opt)
+          std::string local_algo = boost::get<std::string>
+	    (parameters ()["nlopt.local_algorithm"].value);
+          ::nlopt::opt local_opt (algo_map_[local_algo],
+                                  static_cast<unsigned int> (n_));
+          local_opt.set_xtol_rel (opt.get_xtol_rel ());
+          local_opt.set_xtol_abs (opt.get_xtol_abs ());
+          local_opt.set_maxeval (opt.get_maxeval ());
+          opt.set_local_optimizer (local_opt);
+	}
 
       // Set objective function
       typedef detail::Wrapper<function_t> obj_wrapper_t;
@@ -324,10 +352,10 @@ namespace roboptim
 	    }
 	  boost::shared_ptr<ConstantFunction> cst_lb =
 	    boost::make_shared<ConstantFunction> (g->inputSize (),
-                                              lowerBoundValues);
+						  lowerBoundValues);
 	  boost::shared_ptr<ConstantFunction> cst_ub =
 	    boost::make_shared<ConstantFunction> (g->inputSize (),
-                                              upperBoundValues);
+						  upperBoundValues);
 
 	  boost::shared_ptr<DifferentiableFunction> g_lb = cst_lb - g;
 	  boost::shared_ptr<DifferentiableFunction> g_ub = g - cst_ub;
@@ -361,13 +389,15 @@ namespace roboptim
       // Solve problem with initial x
       ::nlopt::result opt_result;
       try {
-          opt_result = opt.optimize (stl_x, res_min);
+	opt_result = opt.optimize (stl_x, res_min);
       }
       // Result may still be correct when a roundoff exception is thrown.
       catch (::nlopt::roundoff_limited e)
-      {
+	{
           opt_result = ::nlopt::ROUNDOFF_LIMITED;
-      }
+	}
+
+      // TODO: return state of constraints at the end
 
       switch (opt_result)
 	{
