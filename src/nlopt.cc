@@ -136,7 +136,8 @@ namespace roboptim
         template <typename U>
         void operator () (const U& g)
         {
-	  assert (constraintValues.size () >= g->outputSize () + i_);
+	  assert (constraintValues_.size ()
+              >= static_cast<std::size_t> (g->outputSize ()) + i_);
 	  constraintValues_.segment (i_, g->outputSize ()) = (*g) (x_);
 	  i_ += g->outputSize ();
         }
