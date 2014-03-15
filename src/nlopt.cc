@@ -28,6 +28,7 @@
 #include <boost/optional.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/variant/apply_visitor.hpp>
 
 #include <roboptim/core/function.hh>
 #include <roboptim/core/linear-function.hh>
@@ -48,6 +49,7 @@ namespace roboptim
       using namespace Eigen;
 
       /// \brief Wrapper for NLopt functions.
+      /// TODO: add an optional callback in the wrapper (not available in NLopt)
       template <typename F>
       class Wrapper
       {
@@ -115,6 +117,34 @@ namespace roboptim
 
       protected:
 	const F& f_;
+      };
+
+
+      /// \brief Visitor used to load the last values of constraints.
+      struct constraintLoader : public boost::static_visitor<void>
+      {
+        typedef Function::vector_t vector_t;
+        typedef Function::argument_t argument_t;
+
+        constraintLoader (const argument_t& x,
+                          vector_t& constraintValues) :
+	  x_ (x),
+	  constraintValues_ (constraintValues),
+	  i_ (0)
+        {}
+
+        template <typename U>
+        void operator () (const U& g)
+        {
+	  assert (constraintValues.size () >= g->outputSize () + i_);
+	  constraintValues_.segment (i_, g->outputSize ()) = (*g) (x_);
+	  i_ += g->outputSize ();
+        }
+
+      private:
+        const argument_t& x_;
+        vector_t& constraintValues_;
+        std::size_t i_;
       };
     } // namespace detail
 
@@ -221,6 +251,18 @@ namespace roboptim
 			epsilon_);
     }
 
+#define LOAD_RESULT_CONSTRAINTS()					\
+    /* Return state of constraints at the end of the optimization */	\
+    size_t n_cstr = 0;							\
+    for (size_t i = 0; i < problem ().constraints ().size (); ++i) {	\
+      n_cstr += problem ().boundsVector ()[i].size ();			\
+    }									\
+    result.constraints.resize (n_cstr);					\
+    detail::constraintLoader cl (result.x, result.constraints);		\
+    for (size_t i = 0; i < problem ().constraints ().size (); ++i) {	\
+      boost::apply_visitor (cl, problem ().constraints ()[i]);		\
+    }
+
     // Utility macro to print result with warning message
 #define LOAD_RESULT_WARNINGS(STATUS)					\
     case STATUS:							\
@@ -228,7 +270,7 @@ namespace roboptim
       ResultWithWarnings result (n_, 1);				\
       result.x = map_x;							\
       result.value = problem ().function () (result.x);			\
-      result.constraints.resize (problem ().constraints ().size ());	\
+      LOAD_RESULT_CONSTRAINTS();					\
       result.warnings.push_back (SolverWarning (result_map_[STATUS]));	\
       result_ = result;							\
     }									\
@@ -397,8 +439,6 @@ namespace roboptim
           opt_result = ::nlopt::ROUNDOFF_LIMITED;
 	}
 
-      // TODO: return state of constraints at the end
-
       switch (opt_result)
 	{
 	case ::nlopt::SUCCESS:
@@ -406,7 +446,7 @@ namespace roboptim
 	    Result result (n_, 1);
 	    result.x = map_x;
 	    result.value = problem ().function () (result.x);
-	    result.constraints.resize (problem ().constraints ().size ());
+	    LOAD_RESULT_CONSTRAINTS();
 	    result_ = result;
 	  }
 	  break;
