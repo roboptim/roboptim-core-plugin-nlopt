@@ -60,6 +60,7 @@ namespace roboptim
 	typedef Map<result_t> map_result_t;
 	typedef DifferentiableFunction::argument_t argument_t;
 	typedef Map<const argument_t> map_argument_t;
+	typedef argument_t::Index index_t;
 
 	Wrapper (const F& f) : f_ (f) {}
 	~Wrapper () {}
@@ -67,8 +68,10 @@ namespace roboptim
 	double compute(const std::vector<double>& x,
 		       std::vector<double>& grad)
 	{
-	  Map<const VectorXd> eigen_x (x.data (), x.size ());
-	  Map<VectorXd> eigen_grad (grad.data (), grad.size ());
+	  Map<const VectorXd> eigen_x (x.data (),
+				       static_cast<index_t> (x.size ()));
+	  Map<VectorXd> eigen_grad (grad.data (),
+				    static_cast<index_t> (grad.size ()));
 	  // Compute grad_f(x)
 	  if (!grad.empty ())
 	    {
@@ -124,6 +127,7 @@ namespace roboptim
       struct constraintLoader : public boost::static_visitor<void>
       {
         typedef Function::vector_t vector_t;
+        typedef vector_t::Index index_t;
         typedef Function::argument_t argument_t;
 
         constraintLoader (const argument_t& x,
@@ -137,7 +141,7 @@ namespace roboptim
         void operator () (const U& g)
         {
 	  assert (constraintValues_.size ()
-              >= static_cast<std::size_t> (g->outputSize ()) + i_);
+		  >= static_cast<index_t> (g->outputSize ()) + i_);
 	  constraintValues_.segment (i_, g->outputSize ()) = (*g) (x_);
 	  i_ += g->outputSize ();
         }
@@ -145,7 +149,7 @@ namespace roboptim
       private:
         const argument_t& x_;
         vector_t& constraintValues_;
-        std::size_t i_;
+        vector_t::Index i_;
       };
     } // namespace detail
 
@@ -258,7 +262,7 @@ namespace roboptim
     for (size_t i = 0; i < problem ().constraints ().size (); ++i) {	\
       n_cstr += problem ().boundsVector ()[i].size ();			\
     }									\
-    result.constraints.resize (n_cstr);					\
+    result.constraints.resize (static_cast<index_t> (n_cstr));		\
     detail::constraintLoader cl (result.x, result.constraints);		\
     for (size_t i = 0; i < problem ().constraints ().size (); ++i) {	\
       boost::apply_visitor (cl, problem ().constraints ()[i]);		\
@@ -288,6 +292,7 @@ namespace roboptim
     void SolverNlp::solve () throw ()
     {
       using namespace Eigen;
+      typedef VectorXd::Index index_t;
 
       // Load optional starting point
       if (problem ().startingPoint ())
@@ -340,15 +345,17 @@ namespace roboptim
       // Add bound constraints
       std::vector<double> lb, ub;
       const intervals_t& bounds = problem ().argumentBounds ();
-      for (size_t i = 0; i < bounds.size (); ++i)
+      for (std::size_t i = 0; i < bounds.size (); ++i)
 	{
+	  index_t ii = static_cast<index_t> (i);
+
 	  double lower = bounds[i].first;
 	  double upper = bounds[i].second;
 
 	  // If starting point outside of bounds: move x to bounds
 	  // (else the solver may fail at start)
-	  if (x_[i] < lower) x_[i] = lower;
-	  if (x_[i] > upper) x_[i] = upper;
+	  if (x_[ii] < lower) x_[ii] = lower;
+	  if (x_[ii] > upper) x_[ii] = upper;
 
 	  lb.push_back (lower);
 	  ub.push_back (upper);
@@ -383,15 +390,18 @@ namespace roboptim
 	  const intervals_t& bounds = problem ().boundsVector ()[iter];
 
 	  // Vector of tolerances
-	  std::vector<double> vec_tol (g->outputSize (), epsilon_);
+	  index_t m = g->outputSize ();
+	  std::size_t mm = static_cast<std::size_t> (m);
+	  std::vector<double> vec_tol (mm, epsilon_);
 
-	  ConstantFunction::result_t lowerBoundValues (g->outputSize ());
-	  ConstantFunction::result_t upperBoundValues (g->outputSize ());
+	  ConstantFunction::result_t lowerBoundValues (m);
+	  ConstantFunction::result_t upperBoundValues (m);
 
-	  for (unsigned i = 0; i < g->outputSize (); ++i)
+	  for (std::size_t i = 0; i < mm; ++i)
 	    {
-	      lowerBoundValues[i] = bounds[i].first;
-	      upperBoundValues[i] = bounds[i].second;
+	      index_t ii = static_cast<index_t> (i);
+	      lowerBoundValues[ii] = bounds[i].first;
+	      upperBoundValues[ii] = bounds[i].second;
 	    }
 	  boost::shared_ptr<ConstantFunction> cst_lb =
 	    boost::make_shared<ConstantFunction> (g->inputSize (),
@@ -425,7 +435,7 @@ namespace roboptim
 	}
 
       double res_min;
-      std::vector<double> stl_x (n_);
+      std::vector<double> stl_x (static_cast<std::size_t> (n_));
       Map<argument_t> map_x (stl_x.data (), n_);
       map_x = x_;
 
