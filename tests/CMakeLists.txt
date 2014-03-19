@@ -21,16 +21,15 @@
 SET(PLUGIN_PATH "${CMAKE_BINARY_DIR}/src")
 INCLUDE(shared-tests/tests.cmake)
 
-# Schittkowski problems
-# TODO: investigate 2 8 9 12 19 26 34 47 49 51
-SET(SCHITTKOWSKI_PROBLEMS
-    1 3 4 5 6 7
-    10 13 14 17 18
-    23 27 29
-    30 31 32
-    40 41 42 45 48
-    50
-    71 71b)
+# Schittkowski problems that are expected to fail
+SET(SCHITTKOWSKI_PROBLEMS_FAIL
+    2 8 9
+    12 16 19
+    20 25 26 28
+    33 34 36
+    43 44 47 49
+    51 55
+    65)
 
 SET(SOLVER_NAME "nlopt")
 SET(FUNCTION_TYPE ::roboptim::EigenMatrixDense)
