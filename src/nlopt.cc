@@ -278,6 +278,12 @@ namespace roboptim
       LOAD_RESULT_CONSTRAINTS();					\
       result.warnings.push_back (SolverWarning (result_map_[STATUS]));	\
       result_ = result;							\
+      if (!callback_.empty ())						\
+        {								\
+          solverState_.x () = result.x;					\
+          solverState_.cost () = result.value[0];			\
+          callback_ (problem (), solverState_);				\
+        }								\
     }									\
     break;
 
@@ -285,8 +291,8 @@ namespace roboptim
 #define LOAD_RESULT_ERROR(STATUS)			\
     case STATUS:					\
     {							\
-      result_ = SolverError (result_map_[STATUS]);	\
-    }							\
+    result_ = SolverError (result_map_[STATUS]);	\
+  }							\
     break;
 
     void SolverNlp::solve () throw ()
@@ -434,6 +440,13 @@ namespace roboptim
 	  // TODO: handle equality constraints
 	}
 
+      // Use callback (even if mostly empty)
+      if (!callback_.empty ())
+	{
+	  solverState_.x () = x_;
+          callback_ (problem (), solverState_);
+	}
+
       double res_min;
       std::vector<double> stl_x (static_cast<std::size_t> (n_));
       Map<argument_t> map_x (stl_x.data (), n_);
@@ -459,6 +472,14 @@ namespace roboptim
 	    result.value = problem ().function () (result.x);
 	    LOAD_RESULT_CONSTRAINTS();
 	    result_ = result;
+
+	    // Use callback for last iteration
+	    if (!callback_.empty ())
+	      {
+		solverState_.x () = result.x;
+		solverState_.cost () = result.value[0];
+		callback_ (problem (), solverState_);
+	      }
 	  }
 	  break;
 
