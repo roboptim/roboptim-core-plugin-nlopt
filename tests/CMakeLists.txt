@@ -28,8 +28,9 @@ SET(SCHITTKOWSKI_PROBLEMS_FAIL
     20 25 26 28
     33 34 36
     43 44 47 49
-    51 55
-    65)
+    51 55 56
+    65
+    81)
 
 SET(SOLVER_NAME "nlopt")
 SET(FUNCTION_TYPE ::roboptim::EigenMatrixDense)
