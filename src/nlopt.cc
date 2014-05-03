@@ -458,7 +458,7 @@ namespace roboptim
 	opt_result = opt.optimize (stl_x, res_min);
       }
       // Result may still be correct when a roundoff exception is thrown.
-      catch (::nlopt::roundoff_limited e)
+      catch (::nlopt::roundoff_limited& e)
 	{
           opt_result = ::nlopt::ROUNDOFF_LIMITED;
 	}
