@@ -73,9 +73,9 @@ namespace roboptim {
 
       /// \brief Constructor by problem
       explicit SolverNlp (const problem_t& problem);
-      virtual ~SolverNlp () throw ();
+      virtual ~SolverNlp ();
       /// \brief Solve the optimization problem
-      virtual void solve () throw ();
+      virtual void solve ();
 
       /// \brief Return the number of variables.
       size_type n () const
@@ -103,13 +103,13 @@ namespace roboptim {
 
       /// \brief Set the callback called at each iteration.
       virtual void
-      setIterationCallback (callback_t callback) throw (std::runtime_error)
+      setIterationCallback (callback_t callback)
       {
         callback_ = callback;
       }
 
       /// \brief Get the callback called at each iteration.
-      const callback_t& callback () const throw ()
+      const callback_t& callback () const
       {
         return callback_;
       }
@@ -120,7 +120,7 @@ namespace roboptim {
 
     private:
       /// \brief Initialize solver parameters.
-      void initializeParameters () throw ();
+      void initializeParameters ();
 
     private:
       /// \brief Number of variables

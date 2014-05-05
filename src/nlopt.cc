@@ -223,7 +223,7 @@ namespace roboptim
       global_algos_.insert ("GD_MLSL_LDS");
     }
 
-    SolverNlp::~SolverNlp () throw ()
+    SolverNlp::~SolverNlp ()
     {
     }
 
@@ -233,7 +233,7 @@ namespace roboptim
       parameters ()[KEY].value = VALUE;			\
     } while (0)
 
-    void SolverNlp::initializeParameters () throw ()
+    void SolverNlp::initializeParameters ()
     {
       // Clear parameters
       parameters ().clear ();
@@ -295,7 +295,7 @@ namespace roboptim
   }							\
     break;
 
-    void SolverNlp::solve () throw ()
+    void SolverNlp::solve ()
     {
       using namespace Eigen;
       typedef VectorXd::Index index_t;
