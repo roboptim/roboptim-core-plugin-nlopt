@@ -20,7 +20,7 @@ notifications:
       secure: LJbgx2sjAmTUu+AV8N/PSQHFQ8E1OnHAB2oYFv1XwN2hujtswNwE9k16etaEBRZ0IP1z7mTWrabaztDPC5efEaGpi4TZLMr5P9n/ABWRvJi+tVMXG7fusxTNzOaqcr31g2VQBXJ2nMZWxawP4xzTp+sSVcVsHm5xt4UjLyVQ6+A=
   email: roboptim@googlegroups.com
 before_install:
-- ./.travis/dependencies/eigen-3.2.0
+- ./.travis/dependencies/eigen-3.2
 - ./.travis/dependencies/nlopt
 - ./.travis/run  before_install
 script:
