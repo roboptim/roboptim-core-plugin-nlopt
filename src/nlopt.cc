@@ -318,10 +318,10 @@ namespace roboptim
 			std::string ("LD_MMA"));
       DEFINE_PARAMETER ("nlopt.xtol_rel",
 			"relative tolerance on optimization parameters",
-			epsilon_);
+			1e-6);
       DEFINE_PARAMETER ("nlopt.xtol_abs",
 			"absolute tolerance on optimization parameters",
-			epsilon_);
+			1e-6);
     }
 
 #define LOAD_RESULT_CONSTRAINTS()					\
