@@ -48,6 +48,44 @@ namespace roboptim
     {
       using namespace Eigen;
 
+      template <typename S>
+      class CallbackHandler
+      {
+      public:
+        typedef S solver_t;
+        typedef typename solver_t::problem_t problem_t;
+        typedef typename solver_t::problem_t::function_t::argument_t argument_t;
+        typedef typename solver_t::problem_t::function_t::value_type value_type;
+        typedef typename solver_t::callback_t callback_t;
+        typedef typename solver_t::solverState_t solverState_t;
+
+        CallbackHandler (const solver_t& solver)
+          : problem_ (solver.problem ()),
+            callback_ (solver.callback ()),
+            solverState_ (solver.problem ())
+        {}
+        virtual ~CallbackHandler (){}
+
+        void callback (const argument_t& x, value_type cost)
+        {
+          solverState_.x () = x;
+          solverState_.cost () = cost;
+
+          callback_ (problem_, solverState_);
+        }
+
+      private:
+        /// \brief Intermediate callback (called at each end
+        /// of iteration).
+        const problem_t& problem_;
+
+        /// \brief Callback function.
+        callback_t callback_;
+
+        /// \brief Solver state.
+        solverState_t solverState_;
+      };
+
       /// \brief Wrapper for NLopt functions.
       /// TODO: add an optional callback in the wrapper (not available in NLopt)
       template <typename F>
@@ -61,6 +99,8 @@ namespace roboptim
 	typedef DifferentiableFunction::argument_t argument_t;
 	typedef Map<const argument_t> map_argument_t;
 	typedef argument_t::Index index_t;
+
+	typedef CallbackHandler<SolverNlp> callbackHandler_t;
 
 	Wrapper (const F& f) : f_ (f) {}
 	~Wrapper () {}
@@ -79,7 +119,16 @@ namespace roboptim
 	    }
 
 	  // Compute f(x)
-	  return f_ (eigen_x)[0];
+	  double res = f_ (eigen_x)[0];
+
+	  // Callback (for cost function)
+	  if (callbackHandler_)
+	    {
+	      // Call user-defined callback
+	      callbackHandler_->callback (eigen_x, res);
+	    }
+
+	  return res;
 	}
 
 	void compute(const map_argument_t& x,
@@ -91,6 +140,13 @@ namespace roboptim
 
 	  // Compute f(x)
 	  res = f_ (x);
+
+	  // Callback (for cost function)
+	  if (callbackHandler_)
+	    {
+	      // Call user-defined callback
+	      callbackHandler_->callback (x, res[0]);
+	    }
 	}
 
 	// TODO: use C-style NLopt function to prevent copy to STL vector
@@ -118,8 +174,20 @@ namespace roboptim
 							   map_jac);
 	}
 
+	boost::optional<callbackHandler_t&>& callbackHandler ()
+	{
+	  return callbackHandler_;
+	}
+
+	const boost::optional<callbackHandler_t&>& callbackHandler () const
+	{
+	  return callbackHandler_;
+	}
+
       protected:
 	const F& f_;
+
+	boost::optional<callbackHandler_t&> callbackHandler_;
       };
 
 
@@ -291,8 +359,8 @@ namespace roboptim
 #define LOAD_RESULT_ERROR(STATUS)			\
     case STATUS:					\
     {							\
-    result_ = SolverError (result_map_[STATUS]);	\
-  }							\
+      result_ = SolverError (result_map_[STATUS]);	\
+    }							\
     break;
 
     void SolverNlp::solve ()
@@ -346,6 +414,10 @@ namespace roboptim
       // Set objective function
       typedef detail::Wrapper<function_t> obj_wrapper_t;
       obj_wrapper_t obj (problem ().function ());
+
+      typedef detail::Wrapper<function_t>::callbackHandler_t callbackHandler_t;
+      callbackHandler_t callbackHandler (*this);
+      obj.callbackHandler () = callbackHandler;
       opt.set_min_objective (obj_wrapper_t::wrap, &obj);
 
       // Add bound constraints
