@@ -59,8 +59,9 @@ namespace roboptim
         typedef typename solver_t::callback_t callback_t;
         typedef typename solver_t::solverState_t solverState_t;
 
-        CallbackHandler (const solver_t& solver)
-          : problem_ (solver.problem ()),
+        CallbackHandler (const solver_t& solver, ::nlopt::opt& opt)
+          : opt_ (opt),
+            problem_ (solver.problem ()),
             callback_ (solver.callback ()),
             solverState_ (solver.problem ())
         {}
@@ -71,10 +72,24 @@ namespace roboptim
           solverState_.x () = x;
           solverState_.cost () = cost;
 
+          bool stop_optim = false;
+          solverState_.parameters ()["nlopt.stop"].value = stop_optim;
+          solverState_.parameters ()["nlopt.stop"].description
+            = "Whether to stop the optimization process";
+
           callback_ (problem_, solverState_);
+
+          if (solverState_.parameters ().find ("nlopt.stop")
+              != solverState_.parameters ().end ())
+            stop_optim = solverState_.template getParameter<bool> ("nlopt.stop");
+
+          if (stop_optim) opt_.force_stop ();
         }
 
       private:
+        /// \brief Optimization engine.
+        ::nlopt::opt& opt_;
+
         /// \brief Intermediate callback (called at each end
         /// of iteration).
         const problem_t& problem_;
@@ -416,7 +431,7 @@ namespace roboptim
       obj_wrapper_t obj (problem ().function ());
 
       typedef detail::Wrapper<function_t>::callbackHandler_t callbackHandler_t;
-      callbackHandler_t callbackHandler (*this);
+      callbackHandler_t callbackHandler (*this, opt);
       obj.callbackHandler () = callbackHandler;
       opt.set_min_objective (obj_wrapper_t::wrap, &obj);
 
@@ -530,9 +545,14 @@ namespace roboptim
 	opt_result = opt.optimize (stl_x, res_min);
       }
       // Result may still be correct when a roundoff exception is thrown.
-      catch (::nlopt::roundoff_limited& e)
+      catch (const ::nlopt::roundoff_limited& e)
 	{
           opt_result = ::nlopt::ROUNDOFF_LIMITED;
+	}
+      // User-defined stop.
+      catch (const ::nlopt::forced_stop& e)
+	{
+	  opt_result = ::nlopt::FORCED_STOP;
 	}
 
       switch (opt_result)
@@ -561,10 +581,10 @@ namespace roboptim
 	  LOAD_RESULT_WARNINGS (::nlopt::MAXEVAL_REACHED);
 	  LOAD_RESULT_WARNINGS (::nlopt::MAXTIME_REACHED);
 	  LOAD_RESULT_WARNINGS (::nlopt::ROUNDOFF_LIMITED);
+	  LOAD_RESULT_WARNINGS (::nlopt::FORCED_STOP);
 	  LOAD_RESULT_ERROR (::nlopt::FAILURE);
 	  LOAD_RESULT_ERROR (::nlopt::INVALID_ARGS);
 	  LOAD_RESULT_ERROR (::nlopt::OUT_OF_MEMORY);
-	  LOAD_RESULT_ERROR (::nlopt::FORCED_STOP);
 
 	default:
 	  {
