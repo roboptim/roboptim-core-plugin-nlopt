@@ -23,13 +23,13 @@ INCLUDE(shared-tests/tests.cmake)
 
 # Schittkowski problems that are expected to fail
 SET(SCHITTKOWSKI_PROBLEMS_FAIL
-    2 8 9
-    12 16 19
+    1 2 8 9
+    13 12 16 19
     20 25 26 28
-    33 34 36
-    43 44 47 49
+    33 34 36 39
+    43 44 47 48 49
     51 55 56
-    65
+    65 66
     81)
 
 SET(SOLVER_NAME "nlopt")

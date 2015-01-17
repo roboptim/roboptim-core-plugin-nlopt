@@ -307,7 +307,7 @@ namespace roboptim
       parameters ().clear ();
 
       // Shared parameters
-      DEFINE_PARAMETER ("max-iterations", "number of iterations", 10000);
+      DEFINE_PARAMETER ("max-iterations", "number of iterations", 2000);
 
       // NLopt-specific parameters
       DEFINE_PARAMETER ("nlopt.algorithm",
