@@ -90,13 +90,13 @@ namespace roboptim {
       }
 
       /// \brief Get the optimization parameters.
-      Function::argument_t& parameter ()
+      Function::argument_ref parameter ()
       {
 	return x_;
       }
 
       /// \brief Get the optimization parameters.
-      const Function::argument_t& parameter () const
+      Function::const_argument_ref parameter () const
       {
 	return x_;
       }

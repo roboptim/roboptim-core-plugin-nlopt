@@ -54,7 +54,7 @@ namespace roboptim
       public:
         typedef S solver_t;
         typedef typename solver_t::problem_t problem_t;
-        typedef typename solver_t::problem_t::function_t::argument_t argument_t;
+        typedef typename solver_t::problem_t::function_t::const_argument_ref const_argument_ref;
         typedef typename solver_t::problem_t::function_t::value_type value_type;
         typedef typename solver_t::callback_t callback_t;
         typedef typename solver_t::solverState_t solverState_t;
@@ -67,7 +67,7 @@ namespace roboptim
         {}
         virtual ~CallbackHandler (){}
 
-        void callback (const argument_t& x, value_type cost)
+        void callback (const_argument_ref x, value_type cost)
         {
           solverState_.x () = x;
           solverState_.cost () = cost;
@@ -210,11 +210,12 @@ namespace roboptim
       struct constraintLoader : public boost::static_visitor<void>
       {
         typedef Function::vector_t vector_t;
+        typedef Function::vector_ref vector_ref;
         typedef vector_t::Index index_t;
-        typedef Function::argument_t argument_t;
+        typedef Function::const_argument_ref const_argument_ref;
 
-        constraintLoader (const argument_t& x,
-                          vector_t& constraintValues) :
+        constraintLoader (const_argument_ref x,
+                          vector_ref constraintValues) :
 	  x_ (x),
 	  constraintValues_ (constraintValues),
 	  i_ (0)
@@ -230,8 +231,8 @@ namespace roboptim
         }
 
       private:
-        const argument_t& x_;
-        vector_t& constraintValues_;
+        const_argument_ref x_;
+        vector_ref constraintValues_;
         vector_t::Index i_;
       };
     } // namespace detail
