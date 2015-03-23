@@ -35,8 +35,8 @@
 #include <roboptim/core/problem.hh>
 #include <roboptim/core/solver-error.hh>
 #include <roboptim/core/function/constant.hh>
-#include <roboptim/core/filter/plus.hh>
-#include <roboptim/core/filter/minus.hh>
+#include <roboptim/core/operator/plus.hh>
+#include <roboptim/core/operator/minus.hh>
 
 #include "roboptim/core/plugin/nlopt/nlopt.hh"
 
