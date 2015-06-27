@@ -19,6 +19,10 @@
 # Define the directory where plug-ins will be installed.
 ADD_DEFINITIONS(-DPLUGIN_PATH="${LIBRARY_OUTPUT_PATH}")
 
+# Define the directory where plug-ins will be installed.
+GET_FILENAME_COMPONENT(RELPLUGINDIR ${ROBOPTIM_CORE_PLUGINDIR} NAME)
+SET(PLUGINDIR ${CMAKE_INSTALL_LIBDIR}/${RELPLUGINDIR})
+
 MACRO(NLOPT_PLUGIN NAME)
   ADD_LIBRARY(roboptim-core-plugin-${NAME} MODULE ${NAME}.cc ${HEADERS})
   PKG_CONFIG_USE_COMPILE_DEPENDENCY(roboptim-core-plugin-${NAME} roboptim-core)
@@ -27,7 +31,7 @@ MACRO(NLOPT_PLUGIN NAME)
     PREFIX ""
     SOVERSION 3.1.0)
   INSTALL(TARGETS roboptim-core-plugin-${NAME}
-    DESTINATION ${ROBOPTIM_CORE_PLUGINDIR})
+    DESTINATION ${PLUGINDIR})
 ENDMACRO()
 
 # NLP solver
