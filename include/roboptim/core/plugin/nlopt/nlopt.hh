@@ -36,24 +36,23 @@ namespace roboptim {
     ///
     /// This solver tries to minimize the euclidean norm of a vector valued
     /// function.
-    class SolverNlp :
-      public Solver<DifferentiableFunction,
-                    boost::mpl::vector<LinearFunction,
-                                       DifferentiableFunction> >
+    class SolverNlp : public Solver<EigenMatrixDense>
     {
     public:
       /// \brief Parent type
-      typedef Solver<DifferentiableFunction,
-                     boost::mpl::vector<LinearFunction,
-                                        DifferentiableFunction> > parent_t;
-      /// \brief Cost function type
+      typedef Solver<EigenMatrixDense> parent_t;
+      /// \brief Problem type.
+      typedef parent_t::problem_t problem_t;
+      /// \brief Default function type.
       typedef problem_t::function_t function_t;
+      /// \brief Cost function type
+      typedef DifferentiableFunction differentiableFunction_t;
       /// \brief Argument type
       typedef function_t::argument_t argument_t;
       /// \brief type of result
       typedef function_t::result_t result_t;
       /// \brief type of gradient
-      typedef DifferentiableFunction::gradient_t gradient_t;
+      typedef differentiableFunction_t::gradient_t gradient_t;
       /// \brief Size type
       typedef Function::size_type size_type;
       /// \brief Constraints type

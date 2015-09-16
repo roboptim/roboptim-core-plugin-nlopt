@@ -117,7 +117,8 @@ namespace roboptim
 
 	typedef CallbackHandler<SolverNlp> callbackHandler_t;
 
-	Wrapper (const F& f) : f_ (f) {}
+	// TODO: do an actual shared_ptr copy once the core API is changed
+	Wrapper (const F* f) : f_ (f) {}
 	~Wrapper () {}
 
 	double compute(const std::vector<double>& x,
@@ -130,11 +131,11 @@ namespace roboptim
 	  // Compute grad_f(x)
 	  if (!grad.empty ())
 	    {
-	      eigen_grad = f_.gradient (eigen_x);
+	      eigen_grad = f_->gradient (eigen_x);
 	    }
 
 	  // Compute f(x)
-	  double res = f_ (eigen_x)[0];
+	  double res = (*f_) (eigen_x)[0];
 
 	  // Callback (for cost function)
 	  if (callbackHandler_)
@@ -151,10 +152,10 @@ namespace roboptim
 		     boost::optional<map_jacobian_t>& jac)
 	{
 	  // Compute the Jacobian of f
-	  if (jac) *jac = f_.jacobian (x);
+	  if (jac) *jac = f_->jacobian (x);
 
 	  // Compute f(x)
-	  res = f_ (x);
+	  res = (*f_) (x);
 
 	  // Callback (for cost function)
 	  if (callbackHandler_)
@@ -200,7 +201,7 @@ namespace roboptim
 	}
 
       protected:
-	const F& f_;
+	const F* f_;
 
 	boost::optional<callbackHandler_t&> callbackHandler_;
       };
@@ -348,27 +349,29 @@ namespace roboptim
     }									\
     result.constraints.resize (static_cast<index_t> (n_cstr));		\
     detail::constraintLoader cl (result.x, result.constraints);		\
-    for (size_t i = 0; i < problem ().constraints ().size (); ++i) {	\
-      boost::apply_visitor (cl, problem ().constraints ()[i]);		\
+    for (constraints_t::const_iterator					\
+	   iter = problem ().constraints ().begin ();			\
+         iter != problem ().constraints ().end (); ++iter) {		\
+      cl (*iter);							\
     }
 
     // Utility macro to print result with warning message
 #define LOAD_RESULT_WARNINGS(STATUS)					\
     case STATUS:							\
     {									\
-      ResultWithWarnings result (n_, 1);				\
-      result.x = map_x;							\
-      result.value = problem ().function () (result.x);			\
-      LOAD_RESULT_CONSTRAINTS();					\
-      result.warnings.push_back (SolverWarning (result_map_[STATUS]));	\
-      result_ = result;							\
-      if (!callback_.empty ())						\
-        {								\
-          solverState_.x () = result.x;					\
-          solverState_.cost () = result.value[0];			\
-          callback_ (problem (), solverState_);				\
-        }								\
-    }									\
+    ResultWithWarnings result (n_, 1);					\
+    result.x = map_x;							\
+    result.value = problem ().function () (result.x);			\
+    LOAD_RESULT_CONSTRAINTS();						\
+    result.warnings.push_back (SolverWarning (result_map_[STATUS]));	\
+    result_ = result;							\
+    if (!callback_.empty ())						\
+      {									\
+    solverState_.x () = result.x;					\
+    solverState_.cost () = result.value[0];				\
+    callback_ (problem (), solverState_);				\
+  }									\
+  }									\
     break;
 
     // Utility macro to print error message
@@ -428,10 +431,22 @@ namespace roboptim
 	}
 
       // Set objective function
-      typedef detail::Wrapper<function_t> obj_wrapper_t;
-      obj_wrapper_t obj (problem ().function ());
+      typedef detail::Wrapper<const differentiableFunction_t> obj_wrapper_t;
+      const differentiableFunction_t* objFunc = 0x0;
 
-      typedef detail::Wrapper<function_t>::callbackHandler_t callbackHandler_t;
+      if (problem ().function ().asType<differentiableFunction_t> ())
+	{
+	  // Copy objective function pointer
+	  // FIXME: highly unsafe, wait for problem to return a shared_ptr
+	  // to the objective function...
+	  objFunc = problem ().function ().castInto<differentiableFunction_t> ();
+	}
+      assert (!!objFunc);
+
+      obj_wrapper_t obj (objFunc);
+
+      typedef detail::Wrapper<differentiableFunction_t>::
+        callbackHandler_t callbackHandler_t;
       callbackHandler_t callbackHandler (*this, opt);
       obj.callbackHandler () = callbackHandler;
       opt.set_min_objective (obj_wrapper_t::wrap, &obj);
@@ -473,12 +488,13 @@ namespace roboptim
 	{
 	  // Set constraints
 	  boost::shared_ptr<DifferentiableFunction> g;
-	  if (cstr->which () == linearFunctionId)
-	    g = boost::get<boost::shared_ptr<LinearFunction> > (*cstr);
-	  else
-	    g = boost::get<boost::shared_ptr<DifferentiableFunction> > (*cstr);
-	  assert (!!g);
 
+	  if ((*cstr)->asType<DifferentiableFunction>())
+	    {
+	      g = boost::static_pointer_cast<DifferentiableFunction> (*cstr);
+	    }
+
+	  assert (!!g);
 	  constraints.push_back (g);
 
 	  const intervals_t& bounds = problem ().boundsVector ()[iter];
@@ -507,11 +523,13 @@ namespace roboptim
 	  boost::shared_ptr<DifferentiableFunction> g_lb = cst_lb - g;
 	  boost::shared_ptr<DifferentiableFunction> g_ub = g - cst_ub;
 
-	  constraint_wrapper_ptr wrapper_ub (new constraint_wrapper_t (*g_ub));
+	  constraint_wrapper_ptr wrapper_ub
+	    = boost::make_shared<constraint_wrapper_t> (g_ub.get());
 	  constraint_wrappers.push_back (wrapper_ub);
 	  constraints.push_back (g_ub);
 
-	  constraint_wrapper_ptr wrapper_lb (new constraint_wrapper_t (*g_lb));
+	  constraint_wrapper_ptr wrapper_lb
+	    = boost::make_shared<constraint_wrapper_t> (g_lb.get());
 	  constraint_wrappers.push_back (wrapper_lb);
 	  constraints.push_back (g_lb);
 
