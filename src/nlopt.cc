@@ -441,6 +441,12 @@ namespace roboptim
 	  // to the objective function...
 	  objFunc = problem ().function ().castInto<differentiableFunction_t> ();
 	}
+      else
+      {
+        throw std::runtime_error
+          ("roboptim-core-plugin-nlopt: cost function is not differentiable");
+      }
+
       assert (!!objFunc);
 
       obj_wrapper_t obj (objFunc);
