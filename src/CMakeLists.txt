@@ -29,7 +29,7 @@ MACRO(NLOPT_PLUGIN NAME)
   PKG_CONFIG_USE_DEPENDENCY(roboptim-core-plugin-${NAME} nlopt)
   SET_TARGET_PROPERTIES(roboptim-core-plugin-${NAME} PROPERTIES
     PREFIX ""
-    SOVERSION 3.1.0)
+    SOVERSION 3.2.0)
   INSTALL(TARGETS roboptim-core-plugin-${NAME}
     DESTINATION ${PLUGINDIR})
 ENDMACRO()
