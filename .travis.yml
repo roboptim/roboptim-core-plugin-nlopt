@@ -5,7 +5,7 @@ compiler:
 env:
   global:
   - APT_DEPENDENCIES="doxygen doxygen-latex libltdl-dev libboost-all-dev liblog4cxx10-dev"
-  - GIT_DEPENDENCIES="roboptim/roboptim-core:dev"
+  - GIT_DEPENDENCIES="roboptim/roboptim-core;dev"
   - DEBSIGN_KEYID=5AE5CD75
   - PPA_URI="roboptim/ppa"
   - LCOV_IGNORE_RULES="*tests*"
