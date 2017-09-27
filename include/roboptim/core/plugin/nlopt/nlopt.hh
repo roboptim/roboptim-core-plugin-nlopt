@@ -24,6 +24,7 @@
 
 # include <boost/mpl/vector.hpp>
 
+# include <roboptim/core/plugin/nlopt/config.hh>
 # include <roboptim/core/solver.hh>
 # include <roboptim/core/solver-state.hh>
 

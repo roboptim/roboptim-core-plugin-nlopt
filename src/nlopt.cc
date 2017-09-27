@@ -359,7 +359,7 @@ namespace roboptim
 #define LOAD_RESULT_WARNINGS(STATUS)					\
     case STATUS:							\
     {									\
-    ResultWithWarnings result (n_, 1);					\
+    Result result (n_, 1);						\
     result.x = map_x;							\
     result.value = problem ().function () (result.x);			\
     LOAD_RESULT_CONSTRAINTS();						\
@@ -626,27 +626,27 @@ extern "C"
   using namespace roboptim::nlopt;
   typedef SolverNlp::parent_t solver_t;
 
-  ROBOPTIM_DLLEXPORT unsigned getSizeOfProblem ();
-  ROBOPTIM_DLLEXPORT const char* getTypeIdOfConstraintsList ();
-  ROBOPTIM_DLLEXPORT solver_t* create (const SolverNlp::problem_t& pb);
-  ROBOPTIM_DLLEXPORT void destroy (solver_t* p);
+  ROBOPTIM_CORE_PLUGIN_NLOPT_DLLEXPORT unsigned getSizeOfProblem ();
+  ROBOPTIM_CORE_PLUGIN_NLOPT_DLLEXPORT const char* getTypeIdOfConstraintsList ();
+  ROBOPTIM_CORE_PLUGIN_NLOPT_DLLEXPORT solver_t* create (const SolverNlp::problem_t& pb);
+  ROBOPTIM_CORE_PLUGIN_NLOPT_DLLEXPORT void destroy (solver_t* p);
 
-  ROBOPTIM_DLLEXPORT unsigned getSizeOfProblem ()
+  ROBOPTIM_CORE_PLUGIN_NLOPT_DLLEXPORT unsigned getSizeOfProblem ()
   {
     return sizeof (solver_t::problem_t);
   }
 
-  ROBOPTIM_DLLEXPORT const char* getTypeIdOfConstraintsList ()
+  ROBOPTIM_CORE_PLUGIN_NLOPT_DLLEXPORT const char* getTypeIdOfConstraintsList ()
   {
     return typeid (solver_t::problem_t::constraintsList_t).name ();
   }
 
-  ROBOPTIM_DLLEXPORT solver_t* create (const SolverNlp::problem_t& pb)
+  ROBOPTIM_CORE_PLUGIN_NLOPT_DLLEXPORT solver_t* create (const SolverNlp::problem_t& pb)
   {
     return new SolverNlp (pb);
   }
 
-  ROBOPTIM_DLLEXPORT void destroy (solver_t* p)
+  ROBOPTIM_CORE_PLUGIN_NLOPT_DLLEXPORT void destroy (solver_t* p)
   {
     delete p;
   }
