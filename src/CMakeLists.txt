@@ -25,7 +25,7 @@ SET(PLUGINDIR ${CMAKE_INSTALL_LIBDIR}/${RELPLUGINDIR})
 
 MACRO(NLOPT_PLUGIN NAME)
   ADD_LIBRARY(roboptim-core-plugin-${NAME} MODULE ${NAME}.cc ${HEADERS})
-  PKG_CONFIG_USE_COMPILE_DEPENDENCY(roboptim-core-plugin-${NAME} roboptim-core)
+  PKG_CONFIG_USE_DEPENDENCY(roboptim-core-plugin-${NAME} roboptim-core)
   PKG_CONFIG_USE_DEPENDENCY(roboptim-core-plugin-${NAME} nlopt)
   SET_TARGET_PROPERTIES(roboptim-core-plugin-${NAME} PROPERTIES
     PREFIX ""
